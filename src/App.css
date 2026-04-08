@@ -1,0 +1,78 @@
+.app {
+  max-width: 760px;
+  margin: 40px auto;
+  padding: 0 16px;
+  font-family: Arial, sans-serif;
+}
+
+.summary {
+  color: #555;
+}
+
+.todo-form {
+  display: grid;
+  grid-template-columns: 1fr 180px 80px;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.todo-form input,
+.todo-item input[type='text'],
+.todo-item input[type='date'] {
+  padding: 8px;
+}
+
+.todo-form button,
+.todo-item button {
+  border: 1px solid #d0d0d0;
+  border-radius: 6px;
+  padding: 8px 10px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.todo-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.todo-item {
+  border: 1px solid #ececec;
+  border-radius: 8px;
+  padding: 10px;
+  display: grid;
+  grid-template-columns: 26px 1fr auto auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.todo-content {
+  display: grid;
+  gap: 3px;
+}
+
+.todo-content small {
+  color: #666;
+}
+
+.done {
+  text-decoration: line-through;
+  color: #999;
+}
+
+.error {
+  color: #d50000;
+}
+
+@media (max-width: 640px) {
+  .todo-form {
+    grid-template-columns: 1fr;
+  }
+
+  .todo-item {
+    grid-template-columns: 24px 1fr;
+  }
+}
