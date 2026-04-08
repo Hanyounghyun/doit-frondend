@@ -1,7 +1,46 @@
 import './App.css'
 import { useEffect, useMemo, useState } from 'react'
 
-const API_BASE = '/todos'
+const API_BASE = import.meta.env.VITE_API_URL?.trim()
+
+function normalizeTodo(raw) {
+  if (!raw || typeof raw !== 'object') return null
+  return {
+    _id: raw._id,
+    title: raw.title ?? raw.content ?? '',
+    done: raw.done ?? false,
+    dueDate: raw.dueDate ?? null,
+  }
+}
+
+function unwrapData(payload) {
+  if (Array.isArray(payload)) return payload
+  if (payload && typeof payload === 'object' && 'data' in payload) return payload.data
+  return payload
+}
+
+async function requestJson(url, options) {
+  const res = await fetch(url, options)
+  const text = await res.text()
+
+  let payload = null
+  if (text) {
+    try {
+      payload = JSON.parse(text)
+    } catch (_err) {
+      throw new Error(
+        `서버가 JSON이 아닌 응답을 보냈습니다. VITE_API_URL을 확인하세요. (${text.slice(0, 40)}...)`,
+      )
+    }
+  }
+
+  if (!res.ok) {
+    const message = payload?.message || `요청 실패 (${res.status})`
+    throw new Error(message)
+  }
+
+  return payload
+}
 
 function formatDate(value) {
   if (!value) return '-'
@@ -31,12 +70,12 @@ function App() {
     setLoading(true)
     setError('')
     try {
-      const res = await fetch(API_BASE)
-      const json = await res.json()
-      if (!res.ok || !json.ok) {
-        throw new Error(json.message || '목록 조회에 실패했습니다.')
-      }
-      setTodos(json.data ?? [])
+      const payload = await requestJson(API_BASE)
+      const list = unwrapData(payload)
+      const normalized = (Array.isArray(list) ? list : [])
+        .map((item) => normalizeTodo(item))
+        .filter(Boolean)
+      setTodos(normalized)
     } catch (err) {
       setError(err.message || '네트워크 오류가 발생했습니다.')
     } finally {
@@ -54,19 +93,18 @@ function App() {
     if (!title) return
 
     try {
-      const res = await fetch(API_BASE, {
+      const payload = await requestJson(API_BASE, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title,
+          content: title,
           dueDate: newDueDate || null,
         }),
       })
-      const json = await res.json()
-      if (!res.ok || !json.ok) {
-        throw new Error(json.message || '추가에 실패했습니다.')
-      }
-      setTodos((prev) => [json.data, ...prev])
+      const created = normalizeTodo(unwrapData(payload))
+      if (!created) throw new Error('추가 응답 형식이 올바르지 않습니다.')
+      setTodos((prev) => [created, ...prev])
       setNewTitle('')
       setNewDueDate('')
       setError('')
@@ -95,20 +133,19 @@ function App() {
     }
 
     try {
-      const res = await fetch(`${API_BASE}/${todoId}`, {
+      const payload = await requestJson(`${API_BASE}/${todoId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title,
+          content: title,
           dueDate: editingDueDate || null,
         }),
       })
-      const json = await res.json()
-      if (!res.ok || !json.ok) {
-        throw new Error(json.message || '수정에 실패했습니다.')
-      }
+      const updated = normalizeTodo(unwrapData(payload))
+      if (!updated) throw new Error('수정 응답 형식이 올바르지 않습니다.')
       setTodos((prev) =>
-        prev.map((todo) => (todo._id === todoId ? json.data : todo)),
+        prev.map((todo) => (todo._id === todoId ? updated : todo)),
       )
       setError('')
       cancelEdit()
@@ -119,17 +156,15 @@ function App() {
 
   async function toggleDone(todo) {
     try {
-      const res = await fetch(`${API_BASE}/${todo._id}`, {
+      const payload = await requestJson(`${API_BASE}/${todo._id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ done: !todo.done }),
       })
-      const json = await res.json()
-      if (!res.ok || !json.ok) {
-        throw new Error(json.message || '상태 변경에 실패했습니다.')
-      }
+      const updated = normalizeTodo(unwrapData(payload))
+      if (!updated) throw new Error('상태 변경 응답 형식이 올바르지 않습니다.')
       setTodos((prev) =>
-        prev.map((item) => (item._id === todo._id ? json.data : item)),
+        prev.map((item) => (item._id === todo._id ? updated : item)),
       )
       setError('')
     } catch (err) {
@@ -139,11 +174,7 @@ function App() {
 
   async function deleteTodo(todoId) {
     try {
-      const res = await fetch(`${API_BASE}/${todoId}`, { method: 'DELETE' })
-      const json = await res.json()
-      if (!res.ok || !json.ok) {
-        throw new Error(json.message || '삭제에 실패했습니다.')
-      }
+      await requestJson(`${API_BASE}/${todoId}`, { method: 'DELETE' })
       setTodos((prev) => prev.filter((todo) => todo._id !== todoId))
       if (editingId === todoId) cancelEdit()
       setError('')
